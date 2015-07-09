@@ -10,13 +10,25 @@
 import bge
 import imp
 import sys
-import bpy
 import mathutils
 import math
+import os
 
-sys.path.append(bpy.path.abspath("//module"))
+sys.path.append(bge.logic.expandPath('//module'))
+
+# just scene setup
+scn = bge.logic.getCurrentScene()
+ctl = bge.logic.getCurrentController()
+obj = ctl.owner
 
 foundVRPN = False
+
+def checkIfCamera(obj):
+   
+    if isinstance(obj,bge.types.KX_Camera):
+        return True
+    else:
+        return False
 
 # import logic
 try:
@@ -25,43 +37,64 @@ try:
     foundVRPN = True
 except ImportError:
     foundVRPN = False
-
-# just scene setup
-scn = bge.logic.getCurrentScene()
-ctl = bge.logic.getCurrentController()
-obj = ctl.owner
-
-# modify this scale according to units in the file    
-
-
-# vrpn Callback
-def vrpnCallback(userdata, data):
-
-    scale = 1.0
-
+    
+globalScale = 10.0
+    
+def applyForObject(userdata,data):
+    scale = globalScale
+    
+    # update scale from Game properties
     if 'Scale' in obj:
         scale = obj['Scale']
     
     # update the position
     if 'position' in data:
-        obj.worldPosition.x = data['position'][0] * scale
-        obj.worldPosition.y = data['position'][1] * scale
-        obj.worldPosition.z = data['position'][2] * scale
+        obj.worldPosition.x =   data['position'][0] * scale
+        obj.worldPosition.y = - data['position'][2] * scale
+        obj.worldPosition.z =   data['position'][1] * scale
         
         
     # get rotation
     if 'quaternion' in data:
                 
         # get rotation as a quaternion
-        qR = mathutils.Quaternion(data['quaternion'])
         
-        # set as world orientation 
-        obj.worldOrientation = qR.to_matrix()
+        quatVRPN = data['quaternion']
+        
+        qV = mathutils.Quaternion((quatVRPN[3],quatVRPN[0],- quatVRPN[2],quatVRPN[1]))
+        obj.worldOrientation = qV
+    
         
     # debug
     if 'Debug' in obj and obj['Debug']:
 
         obj['Info'] = str(obj.worldPosition)
+    pass
+
+
+def applyForCamera(userdata,data):
+    
+    scale = globalScale
+    
+    # update scale from Game properties
+    if 'Scale' in obj:
+        scale = obj['Scale']
+    
+    obj.position.x =   data['position'][0] * scale
+    obj.position.y = - data['position'][2] * scale
+    obj.position.z =   data['position'][1] * scale
+    
+    pass
+
+# vrpn Callback
+def vrpnCallback(userdata, data):
+    
+    if checkIfCamera(userdata):
+        scn.active_camera = userdata
+        applyForCamera(userdata,data)
+    else:
+        applyForObject(userdata,data) 
+
                     
         
         
